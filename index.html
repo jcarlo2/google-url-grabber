@@ -29,35 +29,40 @@
         return;
       }
       const bad = /^https?:\/\/([^\/]*\.)?(google|gstatic|googleusercontent|googleadservices)\.[a-z.]+(\/|$)/;
-      const clean = a => {
-        let x = a.getAttribute("href") || "";
+      const norm = x => {
+        x = (x || "").replace(/&amp;/g, "&");
         if (x.startsWith("/url?")) x = new URLSearchParams(x.split("?")[1]).get("q") || "";
         return x.startsWith("http") && !bad.test(x) ? x : "";
       };
-      const extract = d => {
+      const fromDom = d => {
         const links = [...d.querySelectorAll("a")];
-        let list = links.filter(a => a.querySelector("h3")).map(clean).filter(Boolean);
-        if (!list.length) list = links.map(clean).filter(Boolean);
+        let list = links.filter(a => a.querySelector("h3")).map(a => norm(a.getAttribute("href"))).filter(Boolean);
+        if (!list.length) list = links.map(a => norm(a.getAttribute("href"))).filter(Boolean);
         return [...new Set(list)];
       };
-      let u = [];
+      const fromText = t => [...new Set([...t.matchAll(/href="([^"]+)"/g)].map(m => norm(m[1])).filter(Boolean))];
+
+      let u = [], why = "";
       if (location.pathname === "/search") {
-        u = extract(document);
+        u = fromDom(document);
+        if (!u.length) why = "Page title: " + document.title + ". Links on page: " + document.querySelectorAll("a").length + ".";
       } else {
         const w = prompt("Enter search word:");
         if (!w) return;
         const url = "/search?hl=en&num=10&q=" + encodeURIComponent(w);
         try {
           const r = await fetch(url, { credentials: "include" });
-          u = extract(new DOMParser().parseFromString(await r.text(), "text/html"));
-        } catch (e) {}
+          const t = await r.text();
+          u = fromText(t);
+          if (!u.length) why = "HTTP " + r.status + ", length " + t.length + (/unusual traffic|captcha/i.test(t) ? ", captcha page" : "") + (/enablejs/i.test(t) ? ", needs JavaScript page" : "");
+        } catch (e) { why = e.message; }
         if (!u.length) {
-          alert("Could not read the results in the background. Opening the results page now. Click this bookmark again once it has loaded.");
+          alert("Background read failed (" + why + "). Opening the results page now. Click this bookmark again once it has loaded.");
           location.href = url;
           return;
         }
       }
-      if (!u.length) { alert("No URLs found on this page."); return; }
+      if (!u.length) { alert("No URLs found. " + why); return; }
       const t = document.createElement("textarea");
       t.value = u.join("\n");
       t.title = "Double-click to close";
@@ -87,7 +92,7 @@
       }
 
       return h("div", null,
-        h("h1", null, "URL Grabber v1.01 (free, no API key)"),
+        h("h1", null, "URL Grabber (free, no API key)"),
         h("p", null, "Grabs the first-page result URLs from Google. It runs inside the Google page in your own browser, so it costs nothing."),
         h("h3", null, "Option 1: Bookmark button"),
         h("ol", null,
