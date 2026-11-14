@@ -40,7 +40,6 @@
         if (!list.length) list = links.map(a => norm(a.getAttribute("href"))).filter(Boolean);
         return [...new Set(list)];
       };
-      const fromText = t => [...new Set([...t.matchAll(/href="([^"]+)"/g)].map(m => norm(m[1])).filter(Boolean))];
 
       let u = [], why = "";
       if (location.pathname === "/search") {
@@ -49,18 +48,9 @@
       } else {
         const w = prompt("Enter search word:");
         if (!w) return;
-        const url = "/search?hl=en&num=10&q=" + encodeURIComponent(w);
-        try {
-          const r = await fetch(url, { credentials: "include" });
-          const t = await r.text();
-          u = fromText(t);
-          if (!u.length) why = "HTTP " + r.status + ", length " + t.length + (/unusual traffic|captcha/i.test(t) ? ", captcha page" : "") + (/enablejs/i.test(t) ? ", needs JavaScript page" : "");
-        } catch (e) { why = e.message; }
-        if (!u.length) {
-          alert("Background read failed (" + why + "). Opening the results page now. Click this bookmark again once it has loaded.");
-          location.href = url;
-          return;
-        }
+        alert("Opening the results page. When it has loaded, click this bookmark again to grab the URLs.");
+        location.href = "/search?hl=en&num=10&q=" + encodeURIComponent(w);
+        return;
       }
       if (!u.length) { alert("No URLs found. " + why); return; }
       const t = document.createElement("textarea");
@@ -92,14 +82,14 @@
       }
 
       return h("div", null,
-        h("h1", null, "URL Grabber v1.02 (free, no API key)"),
+        h("h1", null, "URL v1.03 Grabber (free, no API key)"),
         h("p", null, "Grabs the first-page result URLs from Google. It runs inside the Google page in your own browser, so it costs nothing."),
         h("h3", null, "Option 1: Bookmark button"),
         h("ol", null,
           h("li", null, "Show your bookmarks bar (Ctrl+Shift+B)."),
           h("li", null, "Drag this button onto the bookmarks bar: ", h("a", { className: "bm", ref: linkRef, onClick: e => e.preventDefault() }, "Grab URLs")),
-          h("li", null, "Open google.com and click the bookmark."),
-          h("li", null, "Type your search word. If the results page opens instead, click the bookmark again there. The URLs are copied to your clipboard and shown in a box.")
+          h("li", null, "Open google.com and click the bookmark (or click it directly on any Google results page)."),
+          h("li", null, "Type your search word. The results page opens; click the bookmark again there. The URLs are copied to your clipboard and shown in a box.")
         ),
         h("h3", null, "Option 2: Console (if bookmarks are blocked)"),
         h("ol", null,
