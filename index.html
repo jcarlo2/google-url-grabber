@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>URL Grabber</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #222; line-height: 1.5; }
+    h1 { font-size: 1.4rem; }
+    ol li { margin-bottom: .5rem; }
+    a.bm { display: inline-block; padding: .6rem 1.2rem; background: #2b5fd9; color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: grab; }
+    textarea { width: 100%; height: 220px; font-family: monospace; font-size: .8rem; box-sizing: border-box; padding: .6rem; }
+    button { padding: .45rem .9rem; font-size: .95rem; border: 0; border-radius: 6px; background: #666; color: #fff; cursor: pointer; margin-top: .4rem; }
+    .note { font-size: .85rem; color: #666; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script>
+    const h = React.createElement;
+
+    // This runs on the Google page itself, so it is free and needs no API key.
+    async function grabber() {
+      const w = prompt("Enter search word:");
+      if (!w) return;
+      try {
+        const r = await fetch("/search?hl=en&num=10&q=" + encodeURIComponent(w), { credentials: "include" });
+        const d = new DOMParser().parseFromString(await r.text(), "text/html");
+        const u = [...new Set(
+          [...d.querySelectorAll("a")]
+            .filter(a => a.querySelector("h3"))
+            .map(a => {
+              const x = a.getAttribute("href") || "";
+              return x.startsWith("/url?") ? new URLSearchParams(x.split("?")[1]).get("q") : x;
+            })
+            .filter(x => x && x.startsWith("http") && !x.includes("google.com"))
+        )];
+        if (!u.length) { alert("No URLs found. Google may have shown a consent or captcha page."); return; }
+        const t = document.createElement("textarea");
+        t.value = u.join("\n");
+        t.title = "Double-click to close";
+        t.style.cssText = "position:fixed;top:10%;left:10%;width:80%;height:60%;z-index:99999;font:13px monospace;padding:8px;background:#fff;color:#000;border:2px solid #2b5fd9";
+        t.ondblclick = () => t.remove();
+        document.body.appendChild(t);
+        t.select();
+        let ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) {}
+        alert(u.length + " URLs found" + (ok ? " and copied to clipboard." : ". Press Ctrl+C to copy.") + "\n(Double-click the box to close it.)");
+      } catch (e) {
+        alert("Failed: " + e.message);
+      }
+    }
+
+    const bookmarklet = "javascript:" + encodeURIComponent("(" + grabber.toString() + ")()");
+    const consoleCode = "(" + grabber.toString() + ")()";
+
+    function App() {
+      const linkRef = React.useRef(null);
+      const [copied, setCopied] = React.useState("");
+
+      React.useEffect(() => {
+        if (linkRef.current) linkRef.current.setAttribute("href", bookmarklet);
+      }, []);
+
+      async function copyCode() {
+        try { await navigator.clipboard.writeText(consoleCode); setCopied("Copied."); }
+        catch (e) { setCopied("Copy blocked. Select the text and copy it manually."); }
+      }
+
+      return h("div", null,
+        h("h1", null, "URL Grabber (free, no API key)"),
+        h("p", null, "Grabs the first-page result URLs from Google. It runs inside the Google page in your own browser, so it costs nothing."),
+        h("h3", null, "Option 1: Bookmark button"),
+        h("ol", null,
+          h("li", null, "Show your bookmarks bar (Ctrl+Shift+B)."),
+          h("li", null, "Drag this button onto the bookmarks bar: ", h("a", { className: "bm", ref: linkRef, onClick: e => e.preventDefault() }, "Grab URLs")),
+          h("li", null, "Open google.com and click the bookmark."),
+          h("li", null, "Type your search word. The URLs are copied to your clipboard and shown in a box.")
+        ),
+        h("h3", null, "Option 2: Console (if bookmarks are blocked)"),
+        h("ol", null,
+          h("li", null, "Open google.com, press F12, and open the Console tab."),
+          h("li", null, "If pasting is blocked, type allow pasting and press Enter."),
+          h("li", null, "Paste the code below and press Enter.")
+        ),
+        h("textarea", { readOnly: true, value: consoleCode }),
+        h("div", null, h("button", { onClick: copyCode }, "Copy code"), " ", h("span", { className: "note" }, copied))
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+  </script>
+</body>
+</html>
